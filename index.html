@@ -1,0 +1,219 @@
+<head></head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AB Maths</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <div id="app">
+    <!-- Navigation -->
+    <nav class="navbar">
+      <div class="logo" @click="currentPage = 'home'" role="button" tabindex="0">
+        <h1>AB Maths</h1>
+      </div>
+      <div class="nav-links">
+        <a @click="currentPage = 'home'" :class="{ active: currentPage === 'home' }">Home</a>
+        <a @click="currentPage = 'courses'" :class="{ active: currentPage === 'courses' }">Courses</a>
+        <a @click="currentPage = 'quiz'" :class="{ active: currentPage === 'quiz' }">Quiz</a>
+        <a @click="currentPage = 'timetable'" :class="{ active: currentPage === 'timetable' }">Timetable</a>
+        <a v-if="!user.isLoggedIn" @click="showLoginModal = true">Login</a>
+        <a v-else @click="logout">Logout ({{ user.name }})</a>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main>
+      <!-- Home Page -->
+      <section v-show="currentPage === 'home'" class="hero">
+        <div class="hero-content">
+          <h1>Welcome to AB Maths</h1>
+          <p>Transform your mathematical journey with expert tutoring and interactive learning experiences</p>
+          <div class="cta-buttons">
+            <button @click="currentPage = 'courses'" class="btn primary">
+              Explore Courses
+            </button>
+            <button @click="showLoginModal = true" class="btn secondary">
+              Get Started
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Courses Page -->
+      <section v-show="currentPage === 'courses'" class="courses-section">
+        <h2>Our Courses</h2>
+        <div class="course-filters">
+          <button v-for="level in ['all', 'Beginner', 'Advanced']" @click="selectedLevel = level" :class="['filter-btn', { active: selectedLevel === level }]">
+            {{ level }}
+          </button>
+        </div>
+        <div class="courses-grid">
+          <div v-for="course in filteredCourses" :key="course.id" class="course-card">
+            <h3>{{ course.title }}</h3>
+            <p class="course-level">Level: {{ course.level }}</p>
+            <p class="course-description">{{ course.description }}</p>
+            <ul class="course-topics">
+              <li v-for="topic in course.topics">{{ topic }}</li>
+            </ul>
+            <button @click="enrollCourse(course.id)" class="btn primary">
+              Enroll Now
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Quiz Page -->
+      <section v-show="currentPage === 'quiz'" class="quiz-section">
+        <div class="quiz-container">
+          <!-- Quiz Start Screen -->
+          <div v-if="!quizState.isActive && !quizState.completed" class="quiz-intro">
+            <h2>Math Practice Quiz</h2>
+            <p>Test your mathematics knowledge!</p>
+            <button @click="startQuiz" class="btn primary">Start Quiz</button>
+          </div>
+
+          <!-- Quiz Questions -->
+          <div v-if="quizState.isActive" class="question-card">
+            <div class="quiz-progress">
+              <p>Question {{ quizState.currentQuestion + 1 }} of {{ questions.length }}</p>
+              <div class="progress-bar">
+                <div class="progress" :style="{ width: quizProgress + '%' }"></div>
+              </div>
+            </div>
+            <h3>{{ currentQuestion.question }}</h3>
+            <div class="options">
+              <button v-for="(option, index) in currentQuestion.options" @click="submitAnswer(index)" class="option-btn">
+                {{ option }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Quiz Results -->
+          <div v-if="quizState.completed" class="quiz-results">
+            <h2>Quiz Completed!</h2>
+            <p>Your Score: {{ quizState.score }} out of {{ questions.length }}</p>
+            <canvas id="quizResults"></canvas>
+            <button @click="startQuiz" class="btn primary">Try Again</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Timetable Page -->
+      <section v-show="currentPage === 'timetable'" class="timetable-section">
+        <h2>Class Schedule</h2>
+        <div class="timetable-container">
+          <div class="week-navigation">
+            <button class="btn secondary" @click="previousWeek">&lt; Previous Week</button>
+            <h3>{{ currentWeekDisplay }}</h3>
+            <button class="btn secondary" @click="nextWeek">Next Week &gt;</button>
+          </div>
+
+          <div class="weekly-calendar">
+            <div class="calendar-header">
+              <div class="day-header" v-for="day in weekDays">{{ day }}</div>
+            </div>
+            <div class="calendar-body">
+              <div class="day-column" v-for="day in weekDays">
+                <div v-for="slot in getDaySchedule(day)" class="class-slot" :class="'course-' + slot.courseId">
+                  <h4>{{ slot.courseName }}</h4>
+                  <p>{{ slot.time }}</p>
+                  <p>Room: {{ slot.room }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Login Modal -->
+    <div v-if="showLoginModal" class="modal">
+      <div class="modal-content">
+        <button @click="showLoginModal = false" class="close">&times;</button>
+
+        <!-- Login/Signup Toggle -->
+        <div class="auth-toggle">
+          <button :class="['toggle-btn', { active: !isSignup }]" @click="isSignup = false">Login</button>
+          <button :class="['toggle-btn', { active: isSignup }]" @click="isSignup = true">Sign Up</button>
+        </div>
+
+        <!-- Login Form -->
+        <form v-if="!isSignup" @submit.prevent="login" class="auth-form">
+          <h2>Welcome Back</h2>
+          <div v-if="loginForm.errors.length" class="error-messages">
+            <p v-for="error in loginForm.errors" class="error">{{ error }}</p>
+          </div>
+          <div class="form-group">
+            <label for="loginEmail">Email</label>
+            <input id="loginEmail" v-model="loginForm.email" type="email" required>
+          </div>
+          <div class="form-group">
+            <label for="loginPassword">Password</label>
+            <input id="loginPassword" v-model="loginForm.password" type="password" required>
+          </div>
+          <button type="submit" class="btn primary">Login</button>
+        </form>
+
+        <!-- Signup Form -->
+        <form v-else @submit.prevent="signup" class="auth-form">
+          <h2>Create Account</h2>
+          <div v-if="signupForm.errors.length" class="error-messages">
+            <p v-for="error in signupForm.errors" class="error">{{ error }}</p>
+          </div>
+
+          <div class="form-group">
+            <label for="fullName">Full Name</label>
+            <input id="fullName" v-model="signupForm.fullName" type="text" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="age">Age</label>
+              <input id="age" v-model="signupForm.age" type="number" min="5" max="100" required>
+            </div>
+            <div class="form-group">
+              <label for="grade">Grade</label>
+              <select id="grade" v-model="signupForm.grade" required>
+                <option value="">Select Grade</option>
+                <option v-for="grade in grades" :value="grade">
+                  Grade {{ grade }}
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="phone">Phone Number</label>
+            <input id="phone" v-model="signupForm.phone" type="tel" pattern="[0-9]{10}" placeholder="10-digit number" required>
+          </div>
+
+          <div class="form-group">
+            <label for="signupEmail">Email</label>
+            <input id="signupEmail" v-model="signupForm.email" type="email" required>
+          </div>
+
+          <div class="form-group">
+            <label for="signupPassword">Password</label>
+            <input id="signupPassword" v-model="signupForm.password" type="password" required>
+          </div>
+
+          <div class="form-group">
+            <label for="confirmPassword">Confirm Password</label>
+            <input id="confirmPassword" v-model="signupForm.confirmPassword" type="password" required>
+          </div>
+
+          <button type="submit" class="btn primary">Create Account</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="script.js"></script>
+</body>
+
+</html>
